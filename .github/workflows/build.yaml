@@ -1,0 +1,69 @@
+name: Build Plugin
+on:
+  workflow_call:
+  push:
+  pull_request:
+  merge_group:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - platform: linux
+            runner: ubuntu-latest
+            dotnet: linux-x64
+            libvmx_library: libvmx.so
+            omtplugin_binary: omtplugin.so
+          - platform: windows
+            runner: windows-latest
+            dotnet:platform: windows-x64
+            bin_extension: 'dll'
+            libvmx_library: libvmx.dll
+            omtplugin_binary: omtplugin.dll
+    defaults:
+      run:
+        shell: bash
+          
+    name: Build (${{ matrix.target.platform }})
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ./plugin
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore cached dependencies
+        id: cache-deps
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{matrix.target.libvmx_library}}
+            libomtnet.dll
+          key: ${{ runner.os }}-dependencies
+
+      - name: Build dependencies
+        uses: ./plugin/.github/actions/dependencies
+        with: 
+          platform: ${{ matrix.target.platform }}
+
+      - name: Build omtplugin
+        working-directory: ./plugin
+        run: |
+          dotnet publish ./omtplugin.sln -r ${{ matrix.target.dotnet }} -c Release
+          cp ./bin/Release/net8.0/${{matrix.target.dotnet}}/publish/${{matrix.target.omtplugin_binary}} ../${{matrix.target.omtplugin_binary}}
+
+      # Upload the build
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omtplugin-${{ matrix.target.platform }}
+          path: |
+            ${{matrix.target.libvmx_library}}
+            libomtnet.dll
+            ${{matrix.target.omtplugin_binary}}

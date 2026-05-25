@@ -1,0 +1,45 @@
+name: Build dependencies
+inputs:
+  platform:
+    description: "target platform to build for"
+    required: true
+    default: "linux"
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout libomtnet
+      uses: actions/checkout@v4
+      with:
+        repository: openmediatransport/libomtnet
+        path: ./libomtnet
+    - name: Checkout libvmx
+      uses: actions/checkout@v4
+      with:
+        repository: openmediatransport/libvmx
+        path: ./libvmx
+
+    - name: Build libomtnet
+      shell: bash
+      run: |
+        dotnet build -c Release
+        cp ./bin/Release/netstandard2.0/libomtnet.dll ../libomtnet.dll
+      working-directory: ./libomtnet
+
+    - name: Build libvmx (cmd)
+      if: contains(matrix.target.platform, 'windows')
+      run: buildwinx64
+      working-directory: ./libvmx/build
+      shell: cmd
+    - if: contains(matrix.target.platform, 'windows')
+      run: cp libvmx.dll ../../libvmx.dll
+      working-directory: ./libvmx/build
+      shell: bash
+
+    - name: Build libvmx (sh)
+      if: contains(matrix.target.platform, 'linux')
+      run: |
+        chmod +x ./buildlinuxx64.sh
+        ./buildlinuxx64.sh
+        cp libvmx.so ../../libvmx.so
+      working-directory: ./libvmx/build
+      shell: bash
